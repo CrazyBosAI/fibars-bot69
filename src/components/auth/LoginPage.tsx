@@ -32,10 +32,10 @@ export const LoginPage: React.FC = () => {
         <div className="text-center">
           <div className="flex items-center justify-center space-x-2 mb-6">
             <TrendingUp className="w-10 h-10 text-blue-500" />
-            <h1 className="text-3xl font-bold text-white">CryptoTrader Pro</h1>
+            <h1 className="text-3xl font-bold text-white">FibarsBot</h1>
           </div>
           <h2 className="text-2xl font-semibold text-gray-300">Welcome back</h2>
-          <p className="text-gray-400 mt-2">Sign in to your trading account</p>
+          <p className="text-gray-400 mt-2">Sign in to your account</p>
         </div>
 
         <div className="bg-gray-800 rounded-xl p-8 border border-gray-700">
