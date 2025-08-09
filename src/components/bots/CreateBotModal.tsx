@@ -85,15 +85,23 @@ export const CreateBotModal: React.FC<CreateBotModalProps> = ({
     setLoading(true);
 
     try {
+      // For demo mode, just simulate success
+      if (!userProfile?.id) {
+        console.log('Demo mode: Bot created successfully');
+        onBotCreated();
+        onClose();
+        resetForm();
+        return;
+      }
+
       const { error } = await supabase
         .from('trading_bots')
         .insert({
           ...formData,
-          user_id: userProfile?.id,
+          user_id: userProfile.id,
           status: 'stopped',
           current_balance: formData.initial_balance,
         });
-
       if (error) throw error;
 
       onBotCreated();
