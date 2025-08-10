@@ -146,6 +146,69 @@ export const Settings: React.FC = () => {
         return (
           <div className="space-y-6">
             <h2 className="text-2xl font-semibold">API Keys</h2>
+            
+            {/* Add API Key Form */}
+            <div className="bg-gray-700 rounded-lg p-6">
+              <h3 className="text-lg font-semibold mb-4">Add New API Key</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Exchange</label>
+                  <select className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500">
+                    <option>Select Exchange</option>
+                    <option>Binance</option>
+                    <option>OKX</option>
+                    <option>Bybit</option>
+                    <option>KuCoin</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Account Type</label>
+                  <select className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500">
+                    <option>Spot Trading</option>
+                    <option>Futures Trading</option>
+                    <option>Copy Trading (Lead Trader)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">API Key Name</label>
+                  <input
+                    type="text"
+                    placeholder="My Binance Spot Account"
+                    className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">API Key</label>
+                  <input
+                    type="password"
+                    placeholder="Enter your API key"
+                    className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">API Secret</label>
+                  <input
+                    type="password"
+                    placeholder="Enter your API secret"
+                    className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Passphrase (Optional)</label>
+                  <input
+                    type="password"
+                    placeholder="Enter passphrase if required"
+                    className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+              <div className="mt-4">
+                <button className="bg-blue-600 hover:bg-blue-700 px-6 py-3 rounded-lg font-semibold transition-colors">
+                  Add API Key
+                </button>
+              </div>
+            </div>
+            
             <div className="space-y-6">
               <div className="bg-yellow-600 bg-opacity-20 border border-yellow-600 rounded-lg p-4">
                 <div className="flex items-center space-x-2">
@@ -159,14 +222,15 @@ export const Settings: React.FC = () => {
 
               <div className="space-y-4">
                 {[
-                  { name: 'Binance', status: 'active', permissions: 'Read, Trade', created: '2024-01-15' },
-                  { name: 'Coinbase Pro', status: 'active', permissions: 'Read Only', created: '2024-02-01' },
-                  { name: 'Kraken', status: 'inactive', permissions: 'Read, Trade', created: '2024-02-10' }
+                  { name: 'Binance Spot', exchange: 'Binance', accountType: 'Spot Trading', status: 'active', permissions: 'Read, Trade', created: '2024-01-15' },
+                  { name: 'Binance Futures', exchange: 'Binance', accountType: 'Futures Trading', status: 'active', permissions: 'Read, Trade', created: '2024-02-01' },
+                  { name: 'OKX Copy Trading', exchange: 'OKX', accountType: 'Copy Trading', status: 'inactive', permissions: 'Read, Trade, Copy', created: '2024-02-10' }
                 ].map((api, index) => (
                   <div key={index} className="bg-gray-700 rounded-lg p-6">
                     <div className="flex items-center justify-between">
                       <div>
                         <h3 className="font-semibold">{api.name}</h3>
+                        <div className="text-sm text-gray-400 mt-1">{api.exchange} - {api.accountType}</div>
                         <div className="flex items-center space-x-4 text-sm text-gray-400 mt-1">
                           <span>Permissions: {api.permissions}</span>
                           <span>Created: {api.created}</span>

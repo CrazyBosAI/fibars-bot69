@@ -59,8 +59,26 @@ export interface Exchange {
   supports_spot: boolean;
   supports_futures: boolean;
   supports_copy_trading: boolean;
+  account_types: string[];
   is_active: boolean;
   fee_structure?: any;
+  created_at: string;
+}
+
+export interface TradingSymbol {
+  id: string;
+  exchange_id: string;
+  symbol: string;
+  base_asset: string;
+  quote_asset: string;
+  account_type: string;
+  is_active: boolean;
+  min_quantity: number;
+  max_quantity?: number;
+  min_price?: number;
+  max_price?: number;
+  price_precision: number;
+  quantity_precision: number;
   created_at: string;
 }
 
@@ -69,9 +87,10 @@ export interface ApiKey {
   user_id: string;
   exchange_id: string;
   name: string;
-  api_key: string;
-  api_secret: string;
-  passphrase?: string;
+  account_type: string;
+  encrypted_api_key: string;
+  encrypted_api_secret: string;
+  encrypted_passphrase?: string;
   permissions: string[];
   whitelisted_ips?: string[];
   is_active: boolean;
@@ -92,6 +111,7 @@ export interface TradingBot {
   trading_pair: string;
   base_currency: string;
   quote_currency: string;
+  account_type: string;
   status: 'running' | 'stopped' | 'paused' | 'error';
   config: any;
   initial_balance: number;
@@ -105,6 +125,7 @@ export interface TradingBot {
   webhook_url?: string;
   webhook_secret?: string;
   copy_trader_id?: string;
+  lead_trader_profile?: any;
   started_at?: string;
   stopped_at?: string;
   created_at: string;
@@ -118,6 +139,7 @@ export interface BotTemplate {
   name: string;
   description?: string;
   strategy_type: string;
+  account_types: string[];
   default_config: any;
   min_balance?: number;
   risk_level?: 'low' | 'medium' | 'high';
@@ -137,6 +159,7 @@ export interface Trade {
   side: 'buy' | 'sell';
   type: 'market' | 'limit' | 'stop' | 'stop_limit';
   quantity: number;
+  account_type: string;
   price?: number;
   executed_price?: number;
   executed_quantity?: number;
@@ -147,6 +170,9 @@ export interface Trade {
   is_futures: boolean;
   leverage: number;
   position_side?: 'long' | 'short';
+  take_profit?: number;
+  stop_loss?: number;
+  trailing_stop?: number;
   executed_at?: string;
   created_at: string;
   bot?: TradingBot;
@@ -156,12 +182,13 @@ export interface Trade {
 export interface BotSignal {
   id: string;
   bot_id: string;
-  signal_type: 'buy' | 'sell' | 'close' | 'update_tp' | 'update_sl';
+  signal_type: 'buy' | 'sell' | 'close' | 'update_tp' | 'update_sl' | 'long' | 'short';
   symbol: string;
   price?: number;
   quantity?: number;
   take_profit?: number;
   stop_loss?: number;
+  trailing_stop?: number;
   leverage?: number;
   signal_data?: any;
   processed: boolean;

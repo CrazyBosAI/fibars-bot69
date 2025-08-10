@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Bot, TrendingUp, Settings, Zap, Copy, Target } from 'lucide-react';
+import { X, Bot, TrendingUp, Settings, Zap, Copy, Target, AlertCircle, Loader } from 'lucide-react';
 import { supabase, Exchange, BotTemplate, ApiKey } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -7,6 +7,17 @@ interface CreateBotModalProps {
   isOpen: boolean;
   onClose: () => void;
   onBotCreated: () => void;
+}
+
+interface TradingSymbol {
+  id: string;
+  symbol: string;
+  base_asset: string;
+  quote_asset: string;
+  account_type: string;
+  min_quantity: number;
+  price_precision: number;
+  quantity_precision: number;
 }
 
 export const CreateBotModal: React.FC<CreateBotModalProps> = ({
@@ -17,9 +28,12 @@ export const CreateBotModal: React.FC<CreateBotModalProps> = ({
   const { userProfile } = useAuth();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [loadingSymbols, setLoadingSymbols] = useState(false);
   const [exchanges, setExchanges] = useState<Exchange[]>([]);
   const [templates, setTemplates] = useState<BotTemplate[]>([]);
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
+  const [tradingSymbols, setTradingSymbols] = useState<TradingSymbol[]>([]);
+  const [selectedTemplate, setSelectedTemplate] = useState<BotTemplate | null>(null);
   
   const [formData, setFormData] = useState({
     name: '',
@@ -27,9 +41,10 @@ export const CreateBotModal: React.FC<CreateBotModalProps> = ({
     template_id: '',
     exchange_id: '',
     api_key_id: '',
-    trading_pair: 'BTC/USDT',
-    base_currency: 'BTC',
-    quote_currency: 'USDT',
+    account_type: 'spot' as const,
+    trading_pair: '',
+    base_currency: '',
+    quote_currency: '',
     initial_balance: 1000,
     config: {} as any,
   });
@@ -40,26 +55,38 @@ export const CreateBotModal: React.FC<CreateBotModalProps> = ({
     }
   }, [isOpen]);
 
+  useEffect(() => {
+    if (formData.exchange_id && formData.account_type) {
+      fetchTradingSymbols();
+    }
+  }, [formData.exchange_id, formData.account_type]);
+
   const fetchData = async () => {
     try {
       // Fetch exchanges
       const { data: exchangesData } = await supabase
         .from('exchanges')
         .select('*')
-        .eq('is_active', true);
+        .eq('is_active', true)
+        .order('display_name');
       
       // Fetch templates
       const { data: templatesData } = await supabase
         .from('bot_templates')
         .select('*')
-        .eq('is_active', true);
+        .eq('is_active', true)
+        .order('name');
       
       // Fetch user's API keys
       const { data: apiKeysData } = await supabase
         .from('api_keys')
-        .select('*, exchange:exchanges(*)')
+        .select(`
+          *,
+          exchange:exchanges(*)
+        `)
         .eq('user_id', userProfile?.id)
-        .eq('is_active', true);
+        .eq('is_active', true)
+        .order('name');
 
       setExchanges(exchangesData || []);
       setTemplates(templatesData || []);
@@ -69,15 +96,65 @@ export const CreateBotModal: React.FC<CreateBotModalProps> = ({
     }
   };
 
+  const fetchTradingSymbols = async () => {
+    if (!formData.exchange_id || !formData.account_type) return;
+    
+    setLoadingSymbols(true);
+    try {
+      const { data: symbolsData } = await supabase
+        .from('trading_symbols')
+        .select('*')
+        .eq('exchange_id', formData.exchange_id)
+        .eq('account_type', formData.account_type)
+        .eq('is_active', true)
+        .order('symbol');
+
+      setTradingSymbols(symbolsData || []);
+    } catch (error) {
+      console.error('Error fetching trading symbols:', error);
+    } finally {
+      setLoadingSymbols(false);
+    }
+  };
+
   const handleTemplateSelect = (template: BotTemplate) => {
+    setSelectedTemplate(template);
     setFormData({
       ...formData,
       strategy_type: template.strategy_type as any,
       template_id: template.id,
       config: template.default_config,
       initial_balance: template.min_balance || 1000,
+      name: `${template.name} #${Date.now().toString().slice(-4)}`,
     });
     setStep(2);
+  };
+
+  const handleApiKeyChange = (apiKeyId: string) => {
+    const apiKey = apiKeys.find(k => k.id === apiKeyId);
+    if (apiKey) {
+      setFormData({
+        ...formData,
+        api_key_id: apiKeyId,
+        exchange_id: apiKey.exchange_id,
+        account_type: apiKey.account_type as any,
+        trading_pair: '', // Reset trading pair when exchange changes
+        base_currency: '',
+        quote_currency: '',
+      });
+    }
+  };
+
+  const handleTradingPairChange = (symbol: string) => {
+    const selectedSymbol = tradingSymbols.find(s => s.symbol === symbol);
+    if (selectedSymbol) {
+      setFormData({
+        ...formData,
+        trading_pair: symbol,
+        base_currency: selectedSymbol.base_asset,
+        quote_currency: selectedSymbol.quote_asset,
+      });
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -94,6 +171,13 @@ export const CreateBotModal: React.FC<CreateBotModalProps> = ({
         return;
       }
 
+      // Generate webhook URL for signal bots
+      let webhookUrl = '';
+      if (formData.strategy_type === 'signal') {
+        const botId = crypto.randomUUID();
+        webhookUrl = `${window.location.origin}/api/webhooks/signal/${botId}`;
+      }
+
       const { error } = await supabase
         .from('trading_bots')
         .insert({
@@ -101,7 +185,10 @@ export const CreateBotModal: React.FC<CreateBotModalProps> = ({
           user_id: userProfile.id,
           status: 'stopped',
           current_balance: formData.initial_balance,
+          webhook_url: webhookUrl,
+          webhook_secret: formData.strategy_type === 'signal' ? crypto.randomUUID() : null,
         });
+
       if (error) throw error;
 
       onBotCreated();
@@ -116,15 +203,18 @@ export const CreateBotModal: React.FC<CreateBotModalProps> = ({
 
   const resetForm = () => {
     setStep(1);
+    setSelectedTemplate(null);
+    setTradingSymbols([]);
     setFormData({
       name: '',
       strategy_type: 'grid',
       template_id: '',
       exchange_id: '',
       api_key_id: '',
-      trading_pair: 'BTC/USDT',
-      base_currency: 'BTC',
-      quote_currency: 'USDT',
+      account_type: 'spot',
+      trading_pair: '',
+      base_currency: '',
+      quote_currency: '',
       initial_balance: 1000,
       config: {},
     });
@@ -147,6 +237,15 @@ export const CreateBotModal: React.FC<CreateBotModalProps> = ({
       case 'signal': return 'text-yellow-400 bg-yellow-600';
       case 'copy_trading': return 'text-purple-400 bg-purple-600';
       default: return 'text-gray-400 bg-gray-600';
+    }
+  };
+
+  const getAccountTypeLabel = (accountType: string) => {
+    switch (accountType) {
+      case 'spot': return 'Spot Trading';
+      case 'futures': return 'Futures Trading';
+      case 'copy_trading': return 'Copy Trading (Lead Trader)';
+      default: return accountType;
     }
   };
 
@@ -191,12 +290,30 @@ export const CreateBotModal: React.FC<CreateBotModalProps> = ({
           {step === 1 && (
             <div>
               <h3 className="text-xl font-semibold mb-6">Choose a Bot Strategy</h3>
+              
+              {/* API Keys Warning */}
+              {apiKeys.length === 0 && (
+                <div className="mb-6 p-4 bg-yellow-600 bg-opacity-20 border border-yellow-600 rounded-lg">
+                  <div className="flex items-center space-x-2">
+                    <AlertCircle className="w-5 h-5 text-yellow-400" />
+                    <span className="text-yellow-400 font-semibold">No API Keys Found</span>
+                  </div>
+                  <p className="text-yellow-200 text-sm mt-2">
+                    You need to add exchange API keys before creating bots. Go to Settings → API Keys to add your exchange credentials.
+                  </p>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {templates.map((template) => (
                   <div
                     key={template.id}
-                    onClick={() => handleTemplateSelect(template)}
-                    className="p-6 bg-gray-700 rounded-lg border border-gray-600 hover:border-blue-500 cursor-pointer transition-all duration-200 hover:bg-gray-650"
+                    onClick={() => apiKeys.length > 0 && handleTemplateSelect(template)}
+                    className={`p-6 bg-gray-700 rounded-lg border border-gray-600 transition-all duration-200 ${
+                      apiKeys.length > 0 
+                        ? 'hover:border-blue-500 cursor-pointer hover:bg-gray-650' 
+                        : 'opacity-50 cursor-not-allowed'
+                    }`}
                   >
                     <div className="flex items-start space-x-4">
                       <div className={`p-3 rounded-lg bg-opacity-20 ${getStrategyColor(template.strategy_type)}`}>
@@ -205,6 +322,16 @@ export const CreateBotModal: React.FC<CreateBotModalProps> = ({
                       <div className="flex-1">
                         <h4 className="font-semibold text-lg">{template.name}</h4>
                         <p className="text-gray-400 text-sm mt-1">{template.description}</p>
+                        
+                        {/* Account Types */}
+                        <div className="flex flex-wrap gap-2 mt-3">
+                          {(template.account_types as string[]).map((accountType) => (
+                            <span key={accountType} className="px-2 py-1 bg-gray-600 text-gray-300 text-xs rounded">
+                              {getAccountTypeLabel(accountType)}
+                            </span>
+                          ))}
+                        </div>
+                        
                         <div className="flex items-center justify-between mt-4">
                           <div className="flex items-center space-x-4 text-sm">
                             <span className={`px-2 py-1 rounded text-xs ${getStrategyColor(template.strategy_type)} bg-opacity-20`}>
@@ -217,6 +344,11 @@ export const CreateBotModal: React.FC<CreateBotModalProps> = ({
                                 'text-red-400 bg-red-600'
                               } bg-opacity-20`}>
                                 {template.risk_level} risk
+                              </span>
+                            )}
+                            {template.is_premium && (
+                              <span className="px-2 py-1 rounded text-xs text-purple-400 bg-purple-600 bg-opacity-20">
+                                PRO
                               </span>
                             )}
                           </div>
@@ -234,9 +366,9 @@ export const CreateBotModal: React.FC<CreateBotModalProps> = ({
             </div>
           )}
 
-          {step === 2 && (
+          {step === 2 && selectedTemplate && (
             <form onSubmit={handleSubmit} className="space-y-6">
-              <h3 className="text-xl font-semibold">Configure Your Bot</h3>
+              <h3 className="text-xl font-semibold">Configure Your {selectedTemplate.name}</h3>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
@@ -259,23 +391,20 @@ export const CreateBotModal: React.FC<CreateBotModalProps> = ({
                   </label>
                   <select
                     value={formData.api_key_id}
-                    onChange={(e) => {
-                      const apiKey = apiKeys.find(k => k.id === e.target.value);
-                      setFormData({
-                        ...formData,
-                        api_key_id: e.target.value,
-                        exchange_id: apiKey?.exchange_id || '',
-                      });
-                    }}
+                    onChange={(e) => handleApiKeyChange(e.target.value)}
                     className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500"
                     required
                   >
                     <option value="">Select API Key</option>
-                    {apiKeys.map((apiKey) => (
-                      <option key={apiKey.id} value={apiKey.id}>
-                        {apiKey.exchange?.display_name} - {apiKey.name}
-                      </option>
-                    ))}
+                    {apiKeys
+                      .filter(apiKey => 
+                        (selectedTemplate.account_types as string[]).includes(apiKey.account_type)
+                      )
+                      .map((apiKey) => (
+                        <option key={apiKey.id} value={apiKey.id}>
+                          {apiKey.exchange?.display_name} - {apiKey.name} ({getAccountTypeLabel(apiKey.account_type)})
+                        </option>
+                      ))}
                   </select>
                 </div>
 
@@ -283,38 +412,49 @@ export const CreateBotModal: React.FC<CreateBotModalProps> = ({
                   <label className="block text-sm font-medium text-gray-300 mb-2">
                     Trading Pair
                   </label>
-                  <input
-                    type="text"
-                    value={formData.trading_pair}
-                    onChange={(e) => {
-                      const pair = e.target.value;
-                      const [base, quote] = pair.split('/');
-                      setFormData({
-                        ...formData,
-                        trading_pair: pair,
-                        base_currency: base || '',
-                        quote_currency: quote || '',
-                      });
-                    }}
-                    className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    placeholder="BTC/USDT"
-                    required
-                  />
+                  <div className="relative">
+                    <select
+                      value={formData.trading_pair}
+                      onChange={(e) => handleTradingPairChange(e.target.value)}
+                      className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      required
+                      disabled={!formData.exchange_id || loadingSymbols}
+                    >
+                      <option value="">
+                        {loadingSymbols ? 'Loading symbols...' : 'Select Trading Pair'}
+                      </option>
+                      {tradingSymbols.map((symbol) => (
+                        <option key={symbol.id} value={symbol.symbol}>
+                          {symbol.symbol} (Min: {symbol.min_quantity} {symbol.base_asset})
+                        </option>
+                      ))}
+                    </select>
+                    {loadingSymbols && (
+                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                        <Loader className="w-5 h-5 animate-spin text-blue-400" />
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Initial Balance (USDT)
+                    Initial Investment (USDT)
                   </label>
                   <input
                     type="number"
                     value={formData.initial_balance}
                     onChange={(e) => setFormData({ ...formData, initial_balance: parseFloat(e.target.value) })}
                     className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    min="1"
+                    min={selectedTemplate.min_balance || 1}
                     step="0.01"
                     required
                   />
+                  {selectedTemplate.min_balance && (
+                    <p className="text-xs text-gray-400 mt-1">
+                      Minimum: ${selectedTemplate.min_balance}
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -422,8 +562,56 @@ export const CreateBotModal: React.FC<CreateBotModalProps> = ({
                   </div>
                   <div className="mt-4 p-4 bg-blue-600 bg-opacity-20 border border-blue-600 rounded-lg">
                     <p className="text-blue-400 text-sm">
-                      <strong>Webhook URL:</strong> This will be generated after creating the bot. 
-                      Use this URL to send trading signals to your bot.
+                      <strong>Webhook Integration:</strong> This bot will receive signals from TradingView or other platforms. 
+                      The webhook URL will be generated after creating the bot.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {formData.strategy_type === 'copy_trading' && (
+                <div className="bg-gray-700 rounded-lg p-6">
+                  <h4 className="font-semibold mb-4 flex items-center">
+                    <Copy className="w-5 h-5 mr-2" />
+                    Copy Trading Settings
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                        Lead Trader ID
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Enter lead trader profile ID"
+                        onChange={(e) => setFormData({
+                          ...formData,
+                          config: { ...formData.config, lead_trader_id: e.target.value }
+                        })}
+                        className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                        Copy Ratio
+                      </label>
+                      <input
+                        type="number"
+                        defaultValue={formData.config.copy_ratio || 1.0}
+                        onChange={(e) => setFormData({
+                          ...formData,
+                          config: { ...formData.config, copy_ratio: parseFloat(e.target.value) }
+                        })}
+                        className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        min="0.1"
+                        max="10"
+                        step="0.1"
+                      />
+                    </div>
+                  </div>
+                  <div className="mt-4 p-4 bg-purple-600 bg-opacity-20 border border-purple-600 rounded-lg">
+                    <p className="text-purple-400 text-sm">
+                      <strong>Copy Trading:</strong> This bot will automatically copy trades from successful lead traders. 
+                      Make sure you have the correct lead trader profile ID.
                     </p>
                   </div>
                 </div>
@@ -439,10 +627,11 @@ export const CreateBotModal: React.FC<CreateBotModalProps> = ({
                 </button>
                 <button
                   type="submit"
-                  disabled={loading}
-                  className="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 disabled:cursor-not-allowed rounded-lg font-semibold transition-colors"
+                  disabled={loading || !formData.trading_pair}
+                  className="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 disabled:cursor-not-allowed rounded-lg font-semibold transition-colors flex items-center space-x-2"
                 >
-                  {loading ? 'Creating Bot...' : 'Create Bot'}
+                  {loading && <Loader className="w-4 h-4 animate-spin" />}
+                  <span>{loading ? 'Creating Bot...' : 'Create Bot'}</span>
                 </button>
               </div>
             </form>
