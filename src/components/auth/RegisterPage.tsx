@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { TrendingUp, Mail, Lock, Eye, EyeOff, AlertCircle, User, Gift } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -16,6 +16,7 @@ export const RegisterPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const navigate = useNavigate();
 
   const { signUp } = useAuth();
 
@@ -54,9 +55,15 @@ export const RegisterPage: React.FC = () => {
       setError(error.message);
     } else {
       setSuccess('Account created successfully! Please check your email to verify your account.');
+      setTimeout(() => navigate('/login'), 2000);
     }
     
     setLoading(false);
+  };
+
+  const handleDemoSignup = () => {
+    // For demo purposes, navigate directly to dashboard
+    navigate('/');
   };
 
   return (
@@ -65,7 +72,7 @@ export const RegisterPage: React.FC = () => {
         <div className="text-center">
           <div className="flex items-center justify-center space-x-2 mb-6">
             <TrendingUp className="w-10 h-10 text-blue-500" />
-            <h1 className="text-3xl font-bold text-white">CryptoTrader Pro</h1>
+            <h1 className="text-3xl font-bold text-white">FibarsBot</h1>
           </div>
           <h2 className="text-2xl font-semibold text-gray-300">Create your account</h2>
           <p className="text-gray-400 mt-2">Start your automated trading journey</p>
@@ -217,6 +224,15 @@ export const RegisterPage: React.FC = () => {
               {loading ? 'Creating Account...' : 'Create Account'}
             </button>
           </form>
+
+          <div className="mt-6">
+            <button
+              onClick={handleDemoSignup}
+              className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors"
+            >
+              Try Demo Mode
+            </button>
+          </div>
 
           <div className="mt-6 text-center">
             <p className="text-gray-400">

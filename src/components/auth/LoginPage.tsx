@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { TrendingUp, Mail, Lock, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -9,6 +9,7 @@ export const LoginPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const navigate = useNavigate();
 
   const { signIn } = useAuth();
 
@@ -21,9 +22,16 @@ export const LoginPage: React.FC = () => {
     
     if (error) {
       setError(error.message);
+    } else {
+      navigate('/');
     }
     
     setLoading(false);
+  };
+
+  const handleDemoLogin = () => {
+    // For demo purposes, navigate directly to dashboard
+    navigate('/');
   };
 
   return (
@@ -112,6 +120,15 @@ export const LoginPage: React.FC = () => {
               {loading ? 'Signing in...' : 'Sign In'}
             </button>
           </form>
+
+          <div className="mt-6">
+            <button
+              onClick={handleDemoLogin}
+              className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors"
+            >
+              Try Demo Mode
+            </button>
+          </div>
 
           <div className="mt-6 text-center">
             <p className="text-gray-400">

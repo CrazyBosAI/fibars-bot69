@@ -63,34 +63,134 @@ export const CreateBotModal: React.FC<CreateBotModalProps> = ({
 
   const fetchData = async () => {
     try {
-      // Fetch exchanges
-      const { data: exchangesData } = await supabase
-        .from('exchanges')
-        .select('*')
-        .eq('is_active', true)
-        .order('display_name');
-      
-      // Fetch templates
-      const { data: templatesData } = await supabase
-        .from('bot_templates')
-        .select('*')
-        .eq('is_active', true)
-        .order('name');
-      
-      // Fetch user's API keys
-      const { data: apiKeysData } = await supabase
-        .from('api_keys')
-        .select(`
-          *,
-          exchange:exchanges(*)
-        `)
-        .eq('user_id', userProfile?.id)
-        .eq('is_active', true)
-        .order('name');
+      // For demo mode, use mock data
+      const mockExchanges: Exchange[] = [
+        {
+          id: '1',
+          name: 'binance',
+          display_name: 'Binance',
+          api_url: 'https://api.binance.com',
+          futures_api_url: 'https://fapi.binance.com',
+          websocket_url: 'wss://stream.binance.com:9443',
+          supports_spot: true,
+          supports_futures: true,
+          supports_copy_trading: true,
+          is_active: true,
+          fee_structure: { maker: 0.001, taker: 0.001 },
+          created_at: new Date().toISOString()
+        },
+        {
+          id: '2',
+          name: 'okx',
+          display_name: 'OKX',
+          api_url: 'https://www.okx.com',
+          futures_api_url: 'https://www.okx.com',
+          websocket_url: 'wss://ws.okx.com:8443',
+          supports_spot: true,
+          supports_futures: true,
+          supports_copy_trading: true,
+          is_active: true,
+          fee_structure: { maker: 0.0008, taker: 0.001 },
+          created_at: new Date().toISOString()
+        }
+      ];
 
-      setExchanges(exchangesData || []);
-      setTemplates(templatesData || []);
-      setApiKeys(apiKeysData || []);
+      const mockTemplates: BotTemplate[] = [
+        {
+          id: '1',
+          name: 'Grid Trading Bot',
+          description: 'Automated grid trading strategy for sideways markets',
+          strategy_type: 'grid',
+          default_config: { grid_count: 10, price_range: 10, investment_per_grid: 100 },
+          min_balance: 1000,
+          risk_level: 'medium',
+          is_premium: false,
+          is_active: true,
+          created_at: new Date().toISOString()
+        },
+        {
+          id: '2',
+          name: 'DCA Bot',
+          description: 'Dollar Cost Averaging strategy for long-term accumulation',
+          strategy_type: 'dca',
+          default_config: { interval: 'daily', amount: 100, max_orders: 10 },
+          min_balance: 500,
+          risk_level: 'low',
+          is_premium: false,
+          is_active: true,
+          created_at: new Date().toISOString()
+        },
+        {
+          id: '3',
+          name: 'Signal Bot',
+          description: 'Execute trades based on TradingView signals',
+          strategy_type: 'signal',
+          default_config: { max_position_size: 1000, risk_per_trade: 2 },
+          min_balance: 1000,
+          risk_level: 'high',
+          is_premium: true,
+          is_active: true,
+          created_at: new Date().toISOString()
+        },
+        {
+          id: '4',
+          name: 'Copy Trading Bot',
+          description: 'Copy trades from successful lead traders',
+          strategy_type: 'copy_trading',
+          default_config: { copy_ratio: 1.0, max_drawdown: 20 },
+          min_balance: 2000,
+          risk_level: 'medium',
+          is_premium: true,
+          is_active: true,
+          created_at: new Date().toISOString()
+        }
+      ];
+
+      const mockApiKeys: ApiKey[] = [
+        {
+          id: '1',
+          user_id: userProfile?.id || 'demo',
+          exchange_id: '1',
+          name: 'Binance Spot Account',
+          encrypted_api_key: 'encrypted_key_1',
+          encrypted_api_secret: 'encrypted_secret_1',
+          permissions: ['read', 'trade'],
+          is_active: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          exchange: mockExchanges[0]
+        },
+        {
+          id: '2',
+          user_id: userProfile?.id || 'demo',
+          exchange_id: '1',
+          name: 'Binance Futures Account',
+          encrypted_api_key: 'encrypted_key_2',
+          encrypted_api_secret: 'encrypted_secret_2',
+          permissions: ['read', 'trade', 'futures'],
+          is_active: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          exchange: mockExchanges[0]
+        },
+        {
+          id: '3',
+          user_id: userProfile?.id || 'demo',
+          exchange_id: '2',
+          name: 'OKX Spot Account',
+          encrypted_api_key: 'encrypted_key_3',
+          encrypted_api_secret: 'encrypted_secret_3',
+          permissions: ['read', 'trade'],
+          is_active: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          exchange: mockExchanges[1]
+        }
+      ];
+
+      setExchanges(mockExchanges);
+      setTemplates(mockTemplates);
+      setApiKeys(mockApiKeys);
     } catch (error) {
       console.error('Error fetching data:', error);
     }
@@ -101,15 +201,51 @@ export const CreateBotModal: React.FC<CreateBotModalProps> = ({
     
     setLoadingSymbols(true);
     try {
-      const { data: symbolsData } = await supabase
-        .from('trading_symbols')
-        .select('*')
-        .eq('exchange_id', formData.exchange_id)
-        .eq('account_type', formData.account_type)
-        .eq('is_active', true)
-        .order('symbol');
+      // Mock trading symbols based on exchange and account type
+      const mockSymbols: TradingSymbol[] = [
+        {
+          id: '1',
+          symbol: 'BTCUSDT',
+          base_asset: 'BTC',
+          quote_asset: 'USDT',
+          account_type: formData.account_type,
+          min_quantity: 0.00001,
+          price_precision: 2,
+          quantity_precision: 5
+        },
+        {
+          id: '2',
+          symbol: 'ETHUSDT',
+          base_asset: 'ETH',
+          quote_asset: 'USDT',
+          account_type: formData.account_type,
+          min_quantity: 0.0001,
+          price_precision: 2,
+          quantity_precision: 4
+        },
+        {
+          id: '3',
+          symbol: 'ADAUSDT',
+          base_asset: 'ADA',
+          quote_asset: 'USDT',
+          account_type: formData.account_type,
+          min_quantity: 1,
+          price_precision: 4,
+          quantity_precision: 0
+        },
+        {
+          id: '4',
+          symbol: 'SOLUSDT',
+          base_asset: 'SOL',
+          quote_asset: 'USDT',
+          account_type: formData.account_type,
+          min_quantity: 0.01,
+          price_precision: 2,
+          quantity_precision: 2
+        }
+      ];
 
-      setTradingSymbols(symbolsData || []);
+      setTradingSymbols(mockSymbols);
     } catch (error) {
       console.error('Error fetching trading symbols:', error);
     } finally {
