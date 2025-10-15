@@ -42,7 +42,7 @@ INSERT INTO auth.users (
   aud,
   role
 ) VALUES (
-  'e8f5a2d1-4b3c-4d5e-8f9a-1b2c3d4e5f6g',
+  'e8f5a2d1-4b3c-4d5e-8f9a-1b2c3d4e5f6a',
   '00000000-0000-0000-0000-000000000000',
   'test69@fibars.com',
   crypt('test69Fibars', gen_salt('bf')),
@@ -76,7 +76,7 @@ INSERT INTO users (
   updated_at
 ) VALUES (
   gen_random_uuid(),
-  'e8f5a2d1-4b3c-4d5e-8f9a-1b2c3d4e5f6g',
+  'e8f5a2d1-4b3c-4d5e-8f9a-1b2c3d4e5f6a',
   'test69@fibars.com',
   'test69_trader',
   'Test Enterprise User',
